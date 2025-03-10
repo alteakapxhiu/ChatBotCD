@@ -1,219 +1,66 @@
-from flask import Flask, render_template, request, send_file
-import fitz  
-import openai
-import qrcode
-from flask import Flask, render_template, request
-from io import BytesIO
-from base64 import b64encode
-import os
-from flask import Flask, render_template, request, url_for
 from flask import Flask, request, jsonify, render_template
-
-from gtts import gTTS
-import warnings
 
 app = Flask(__name__)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Fetch API key securely from environment variable
-
-
-UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    if request.method == 'POST':
-        memory = BytesIO()
-        data = request.form.get('link')
-        img = qrcode.make(data)
-        img.save(memory)
-        memory.seek(0)
-        base64_img = "data:image/png;base64," + b64encode(memory.getvalue()).decode('ascii')
-        return render_template('index.html', data=base64_img)
-    else:
-        return render_template('index.html', data=None)
-
-@app.route('/pdftojpg', methods=['GET', 'POST'])
-def pdftojpg():
-    if request.method == 'POST':
-        if 'pdf_file' not in request.files:
-            return "Ska asnje dokument", 400
-
-        pdf_file = request.files['pdf_file']
-        if pdf_file.filename == '':
-            return "Asnje dokument i zgjedhur", 400
-
-        pdf_path = os.path.join(UPLOAD_FOLDER, pdf_file.filename)
-        pdf_file.save(pdf_path)
-
-        try:
-            pdf_document = fitz.open(pdf_path)
-            page = pdf_document.load_page(0)  
-            pix = page.get_pixmap()
-            output_file = pdf_path.replace('.pdf', '-page-1.jpg')
-            pix.save(output_file)
-            pdf_document.close()
-
-            if os.path.exists(output_file):
-                print(f"File ready for download: {output_file}")
-            else:
-                print(f"Error: File not found: {output_file}")
-
-            return send_file(output_file, as_attachment=True)
-        except Exception as e:
-            return f"An error occurred: {e}", 500
-        finally:
-            os.remove(pdf_path)
-
-    return render_template('pdftojpg.html')
-
-@app.route('/pdftojpeg', methods=['GET', 'POST'])
-def pdftojpeg():
-    if request.method == 'POST':
-        if 'pdf_file' not in request.files:
-            return "Ska asnje dokument", 400
-
-        pdf_file = request.files['pdf_file']
-        if pdf_file.filename == '':
-            return "Asnje dokument i zgjedhur", 400
-
-        pdf_path = os.path.join(UPLOAD_FOLDER, pdf_file.filename)
-        pdf_file.save(pdf_path)
-
-        try:
-            pdf_document = fitz.open(pdf_path)
-            page = pdf_document.load_page(0)  
-            pix = page.get_pixmap()
-            output_file = pdf_path.replace('.pdf', '-page-1.jpeg')
-            pix.save(output_file)
-            pdf_document.close()
-
-            if os.path.exists(output_file):
-                print(f"File ready for download: {output_file}")
-            else:
-                print(f"Error: File not found: {output_file}")
-
-            return send_file(output_file, as_attachment=True)
-        except Exception as e:
-            return f"An error occurred: {e}", 500
-        finally:
-            os.remove(pdf_path)
-
-    return render_template('pdftojpeg.html')
-
-
-@app.route('/pdftopng', methods=['GET', 'POST'])
-def pdftopng():
-    if request.method == 'POST':
-        if 'pdf_file' not in request.files:
-            return "Ska asnje dokument", 400
-
-        pdf_file = request.files['pdf_file']
-        if pdf_file.filename == '':
-            return "Asnje dokument i zgjedhur", 400
-
-        pdf_path = os.path.join(UPLOAD_FOLDER, pdf_file.filename)
-        pdf_file.save(pdf_path)
-
-        try:
-            pdf_document = fitz.open(pdf_path)
-            page = pdf_document.load_page(0)  
-            pix = page.get_pixmap()
-            output_file = pdf_path.replace('.pdf', '-page-1.png')
-            pix.save(output_file)
-            pdf_document.close()
-
-            if os.path.exists(output_file):
-                print(f"File ready for download: {output_file}")
-            else:
-                print(f"Error: File not found: {output_file}")
-
-            return send_file(output_file, as_attachment=True)
-        except Exception as e:
-            return f"An error occurred: {e}", 500
-        finally:
-            os.remove(pdf_path)
-
-    return render_template('pdftopng.html')
-
-@app.route('/text2speech', methods=['GET', 'POST'])
-def text2speech():
-    warnings.filterwarnings("default")
+# Pytje pergjigje te paraperacktuara ktu jan dictionary aka hashtables qe kemi ne java 
+gym_chatbot_responses = {
+    "What are your gym hours?": "Our gym is open from 6 AM to 10 PM every day.",
+    "What time does the gym open?": "Our gym opens at 6 AM and closes at 10 PM daily.",
+    "Kur eshte hapur palestra?": "Palestra eshte hapur nga ora 6 e mengjesit deri ne 10 te mbremjes cdo dite.",
     
-    if request.method == 'POST':
-        text = request.form.get('text', 'Hello')  
-        language = 'en'
-        
-        # Create the gTTS object
-        obj = gTTS(text=text, lang=language, slow=False)
-        
-        # Define the path to save the file inside the 'static' directory
-        save_path = os.path.join(app.static_folder, 'sample.mp3')
-        
-        try:
-            # Check if the 'static' folder exists and create it if not
-            if not os.path.exists(app.static_folder):
-                os.makedirs(app.static_folder)
-            
-            # Save the audio file
-            print(f"Saving file to: {save_path}")
-            obj.save(save_path)
-            print(f"File saved successfully at {os.path.abspath(save_path)}")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            return f"An error occurred during text-to-speech conversion: {e}", 500
-        
-        if os.path.exists(save_path):
-            print("File exists in the directory")
-            return render_template('text2speech.html', data=url_for('static', filename='sample.mp3'))
-
-        else:
-            print("File does not exist in the directory")
-            return "File not found after saving.", 500
+    "Do you offer personal training?": "Yes! We have certified personal trainers available. Please inquire at the front desk for pricing and scheduling.",
+    "Is personal training available?": "Yes, our personal trainers are certified and available for booking.",
+    "A keni trajner personal?": "Po! Kemi trajner te certifikuar qe mund te rezervoni.",
     
-    return render_template('text2speech.html')
+    "What membership plans do you have?": "We offer monthly, quarterly, and yearly membership plans. Prices vary based on the plan and included amenities.",
+    "How much does a membership cost?": "Membership prices depend on the duration and included facilities. Contact us for details!",
+    "Cilat jane planet e anetaresimit?": "Ne ofrojme plane mujore, tremujore dhe vjetore. Cmimet varen nga shërbimet e perfshira.",
+    "Sa kushton?": "Ne ofrojme plane mujore, tremujore dhe vjetore. Cmimet varen nga sherbimet e perfshira.",
+    "Sa eshte cmimi?": "Ne ofrojme plane mujore, tremujore dhe vjetore. Cmimet varen nga sherbimet e perfshira.",
 
-@app.route("/chatbot", methods=["POST"])
-def chatbot():
-    print("Received request:", request.json)
-
-    user_message = request.json.get("message")
     
-    if not user_message:
-        print("No message received.")
-        return jsonify({"response": "No message received."})
+    "Do you have group classes?": "Yes! We offer yoga, HIIT, and spinning classes throughout the week. Check our class schedule for more details.",
+    "What classes do you offer?": "We provide yoga, HIIT, pilates, and Zumba classes.",
+    "A keni klasa ne grup?": "Po! Ne ofrojme klasa si joga, HIIT dhe spinning gjate gjithe javes.",
+    "A keni grupe?": "Po! Ne ofrojme klasa si joga, HIIT dhe spinning gjate gjithe javes.",
+    "A keni individual?": "Po! Ne ofrojme klasa si joga, HIIT dhe spinning gjate gjithe javes me trajner privat.",
+    "A keni ne grup?": "Po! Ne ofrojme klasa si joga, HIIT dhe spinning gjate gjithe javes.",
+    "A keni trajnim ne grup?": "Po! Ne ofrojme klasa si joga, HIIT dhe spinning gjate gjithe javes.",
+    "Cfare klasash keni?": "Ne ofrojme klasa si joga, HIIT dhe spinning gjate gjithe javes.",
 
-    print(f"User message: '{user_message}'")
 
+    
+    "Is there a trial membership available?": "Yes, we offer a 3-day free trial for new members!",
+    "Can I try the gym before signing up?": "Yes! We offer a free 3-day trial for new visitors.",
+    "A ka anetaresim prove?": "Po, ofrojme nje prove falas per 3 dite per anetaret e rinj!",
+    "Cfare ofertash keni?": "Ofrojme nje prove falas per 3 dite per anetaret e rinj!",
+
+    
+    "What equipment do you have?": "Our gym is equipped with treadmills, ellipticals, free weights, resistance machines, and more!",
+    "What machines are available?": "We have cardio machines, weightlifting equipment, and resistance training machines.",
+    "Cfare pajisjesh keni ne palester?": "Palestra jone ka pajisje si rutine, eliptike, pesha te lira dhe makineri rezistence!",
+    "Cfare pajisjesh keni?": "Palestra jone ka pajisje si rutine, eliptike, pesha te lira dhe makineri rezistence!",
+    "Si jane oraret?": "Kemi orare per kedo pasi palestra jone eshte hapur nga ora 7:00 - 21:00",
+    "Ku ndodheni?":"Ne ndodhemi ne komune te parisit para rrethrotullimit."
+}
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/index', methods=['POST'])
+def chatbot_response():
     try:
-        # OpenAI API call using correct syntax
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # Use the correct model name (e.g., "gpt-4")
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": user_message}
-            ]
-        )
-
-        # Get bot's response
-        bot_response = response['choices'][0]['message']['content']
-        print(f"Bot response: '{bot_response}'")
+        data = request.get_json()
+        user_message = data.get("message", "").strip()
+        
+        # Get response or default message
+        bot_response = gym_chatbot_responses.get(user_message, "Me falni, nuk ju kuptova.Une i pergjigjem vetem pyetjeve rreth TechnoGym!")
 
         return jsonify({"response": bot_response})
-
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"response": "Sorry, there was an error processing your message."})
+        print("Error:", str(e))
+        return jsonify({"response": "An error occurred. Please try again later."})
 
-
-# Route for serving the chatbot UI
-@app.route("/chatbot", methods=["GET"])
-def chatbot_html():
-    return render_template('chatbot.html')
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
